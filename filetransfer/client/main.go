@@ -20,7 +20,6 @@ var wg sync.WaitGroup
 func main() {
 
 	//start the client
-	//filename := "C:\\01Dropbox\\Dropbox\\200Programmierung\\gostuff\\pseudoFS\\client1\\büsi.png"
 	basefolder := "C:\\01Dropbox\\Dropbox\\200Programmierung\\gostuff\\pseudoFS\\client1\\sendthis\\"
 	fmt.Println("Starting the client... using basefolder ", basefolder)
 
