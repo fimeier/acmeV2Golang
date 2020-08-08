@@ -1,0 +1,3 @@
+New-AzDnsRecordSet -Name "@" -RecordType "A" -ZoneName "ft.8daysaweek.cc" `
+ -ResourceGroupName "fileTransfer" -Ttl 600 `
+ -DnsRecords (New-AzDnsRecordConfig -IPv4Address "51.154.53.165")

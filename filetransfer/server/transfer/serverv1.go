@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"gitlab.ethz.ch/fimeier/gostuff/filetransfer/encap"
@@ -34,13 +33,38 @@ func Start(portArgument int, pathForFilesToStoreArgument string) {
 
 	http.HandleFunc("/receiveData", receiveDataHandler)
 	http.HandleFunc("/", defaultHandler)
-	addr := "10.80.45.73:" + strconv.Itoa(port)
-	log.Fatal(http.ListenAndServe(addr, nil))
+	//addr := "10.80.45.73:" + strconv.Itoa(port)
+	//log.Fatal(http.ListenAndServe(addr, nil))
+
+	certFile := "C:\\01Dropbox\\Dropbox\\200Programmierung\\gostuff\\pseudoFS\\certificates\\cert.pem"
+	privateKey := "C:\\01Dropbox\\Dropbox\\200Programmierung\\gostuff\\pseudoFS\\certificates\\privateKey.pem"
+
+	err := http.ListenAndServeTLS("10.80.45.73:443", certFile, privateKey, nil)
+	if err != nil {
+		fmt.Println("TSL error?", err.Error())
+	}
 
 }
 
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "URL.Path = %q\n", r.URL.Path)
+	fmt.Fprintf(w, "%s %s %s\n", r.Method, r.URL, r.Proto)
+	for k, v := range r.Header {
+		fmt.Fprintf(w, "Header[%q] = %q\n", k, v)
+		fmt.Fprintf(os.Stdout, "Header[%q] = %q\n", k, v)
+
+	}
+	fmt.Fprintf(w, "Host = %q\n", r.Host)
+	fmt.Fprintf(w, "RemoteAddr = %q\n", r.RemoteAddr)
+	fmt.Fprintf(os.Stdout, "Host = %q\n", r.Host)
+	fmt.Fprintf(os.Stdout, "RemoteAddr = %q\n", r.RemoteAddr)
+	if err := r.ParseForm(); err != nil {
+		log.Print(err)
+	}
+	for k, v := range r.Form {
+		fmt.Fprintf(w, "Form[%q] = %q\n", k, v)
+		fmt.Fprintf(os.Stdout, "Form[%q] = %q\n", k, v)
+
+	}
 }
 
 func receiveDataHandler(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +81,7 @@ func receiveDataHandler(w http.ResponseWriter, r *http.Request) {
 	contentTypeTemp, ok := r.Header["Content-Type"]
 	var contentType string
 	if ok {
-		contentType = contentTypeTemp[0] //wie direkt ohne temp?
+		contentType = contentTypeTemp[0] //wie direkt ohne temp? ähm mit r.Header.get("Content-Type") sollte das funktionieren
 	}
 	switch contentType {
 	case "tbd":
