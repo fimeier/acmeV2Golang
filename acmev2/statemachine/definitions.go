@@ -37,7 +37,10 @@ type ACMEInstance struct {
 
 	certificate string //a pem certificate chain
 
-	dnsManager dnsmanager.AZUREDNS
+	//DNS Challenges
+	dnsRequestCleanup []dnsmanager.DNSConfigurationRequest
+	dnsRequest        dnsmanager.DNSConfigurationRequest
+	dnsManager        dnsmanager.AZUREDNSCredentials //not really used at the moment
 
 	//User Input
 	contact []string //wird im PostNewAccount verwended
@@ -59,6 +62,7 @@ type ACMEInstance struct {
 	authorizationObject     []AuthorizationObject //contains multiple objects for multiple challanges
 	authorizationObjectByte [][]byte
 
+	challangeCreated   map[string]bool
 	challengeStatusMap map[string]ChallengeStatus
 	orderStatus        OrderStatus
 
@@ -141,14 +145,18 @@ func (a *ACMEInstance) CreateInstance(challenge, dir, domains, domainIPs, dnsMan
 	a.ipForDomain = ipDom
 
 	if dnsManager == "azuredns" {
-		a.dnsManager = dnsmanager.AZUREDNS{Login: "dummyuser",
-			Password: "1234",
+		a.dnsManager = dnsmanager.AZUREDNSCredentials{Login: "dummyuser",
+			Password:       "1234",
+			SubscriptionID: "9fa587f1-4961-48a6-b6f6-ec69c6d724f1",
+			ResourceGroups: "fileTransfer",
+			Authorization:  "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsIng1dCI6Imh1Tjk1SXZQZmVocTM0R3pCRFoxR1hHaXJuTSIsImtpZCI6Imh1Tjk1SXZQZmVocTM0R3pCRFoxR1hHaXJuTSJ9.eyJhdWQiOiJodHRwczovL21hbmFnZW1lbnQuY29yZS53aW5kb3dzLm5ldC8iLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC9mMDhhODUxZS1hYzVjLTQ5NGItODk0MS00N2U2YTI2NTc4MWQvIiwiaWF0IjoxNTk3MDY5Njc5LCJuYmYiOjE1OTcwNjk2NzksImV4cCI6MTU5NzA3MzU3OSwiYWNyIjoiMSIsImFpbyI6IkFTUUEyLzhRQUFBQWJPNHQrWW5pYVp2NEUzRG4rYUdGOGxVc25RZzhJQ1VHNS9yZitLMEFrcWM9IiwiYW1yIjpbInB3ZCJdLCJhcHBpZCI6IjdmNTlhNzczLTJlYWYtNDI5Yy1hMDU5LTUwZmM1YmIyOGI0NCIsImFwcGlkYWNyIjoiMiIsImZhbWlseV9uYW1lIjoiTWVpZXIiLCJnaXZlbl9uYW1lIjoiRmlsaXAiLCJncm91cHMiOlsiNzA5YzZmM2YtNTEwYy00NTgwLTlkMGYtYzQ1OWJiMTcyMDE3Il0sImlwYWRkciI6IjUxLjE1NC41My4xNjUiLCJuYW1lIjoiRmlsaXAgTWVpZXIiLCJvaWQiOiJmMGNhMzk3Ni1lNjBlLTQzZDItYTM0ZS0wMDZhZGRlNDVhYmIiLCJwdWlkIjoiMTAwMzIwMDA2QjI2MUZDNyIsInJoIjoiMC5BVHdBSG9XSzhGeXNTMG1KUVVmbW9tVjRIWE9uV1gtdkxweENvRmxRX0Z1eWkwUThBTTQuIiwic2NwIjoidXNlcl9pbXBlcnNvbmF0aW9uIiwic3ViIjoiMzlKdHpVVUFCOFNYNWRWRVBOYWJsZzFiUkp5MkhGdW43TEZDRktxamRlVSIsInRpZCI6ImYwOGE4NTFlLWFjNWMtNDk0Yi04OTQxLTQ3ZTZhMjY1NzgxZCIsInVuaXF1ZV9uYW1lIjoiZmlsaXAubWVpZXJAOGRheXNhd2Vlay5jYyIsInVwbiI6ImZpbGlwLm1laWVyQDhkYXlzYXdlZWsuY2MiLCJ1dGkiOiJ1aXBUU3VVTmhrYXdqckpyNzRSSkFBIiwidmVyIjoiMS4wIiwid2lkcyI6WyI2MmU5MDM5NC02OWY1LTQyMzctOTE5MC0wMTIxNzcxNDVlMTAiXSwieG1zX3RjZHQiOjE1NjgxODgyNzZ9.nzU-Yj1uwpqPqcUJVE7iKunPtTCwFbQ4_pE-EiAiVGWpzi6A2e1t9YAW6s2BqnHVltNDO2xBJRZgyjSuetCekuX_nxvwZIU4hDppl5lrt6O85-PtQrYR34DOa05O2fg7a53lhP_b5uSy3XexZpqwNvpbC0dqAictuv59kN6rlZQyUoP_J70jVx-WhXwGQNpgn9uDs11SDgxioKIgrDh0rA1q0kJxJ-4pLbO6l2B2KfL0lrkSJinKFPslwhRhKTHFhqVbdSkiFV7gyK-Kc13iGzXUiB2aHu3M6B-Yy5fmRoF4SMFqFJelLvlctDPUiLK8b9_qQpX60aYIEnbur4amtg",
 		}
 	}
 
 	a.revokeCert = revoke
 
 	a.challengeStatusMap = make(map[string]ChallengeStatus)
+	a.challangeCreated = make(map[string]bool)
 
 	a.serverKey = serverK //used to communicate with ACME server
 	a.clientKey = clientK
@@ -192,6 +200,33 @@ func (a *ACMEInstance) CreateACMEHTTPsConnection(resourceURL string, bytesToPutO
 	var err error
 
 	switch httpMethod {
+	case "PUT":
+		fmt.Println("PUT case....")
+		client := &http.Client{}
+		request, err := http.NewRequest(http.MethodPut, resourceURL, bytes.NewReader(bytesToPutOnWire))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "CreateACMEHTTPsConnection(): case PUT: http.NewRequest(): created error = ", err.Error())
+		}
+		for k, v := range a.dnsRequest.Header {
+			request.Header.Set(k, v)
+		}
+
+		resp, err = client.Do(request)
+		defer resp.Body.Close()
+	case "DELETE":
+		fmt.Println("PUT case....")
+		client := &http.Client{}
+		request, err := http.NewRequest(http.MethodDelete, resourceURL, bytes.NewReader(bytesToPutOnWire))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "CreateACMEHTTPsConnection(): case PUT: http.NewRequest(): created error = ", err.Error())
+		}
+		for k, v := range a.dnsRequest.Header {
+			request.Header.Set(k, v)
+		}
+
+		resp, err = client.Do(request)
+		defer resp.Body.Close()
+
 	case "GET":
 		//fmt.Println("GET case...")
 		resp, err = http.Get(resourceURL)
@@ -528,11 +563,12 @@ type CSRRequestPart struct {
 }
 
 //ExportCert exports the requested cert including the key
-func (a *ACMEInstance) ExportCert(filenameCert, filenamePrivateKey string) {
+func (a *ACMEInstance) ExportCert(filenameCertPEM, filenamePrivateKey, filenameCert string) {
 
+	//cert.pem
 	fmt.Println("Your new Cert is here.....")
 	fmt.Println(a.certificate)
-	f, err := os.Create(filenameCert)
+	f, err := os.Create(filenameCertPEM)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Send: %v\n", err)
 		return
@@ -540,6 +576,7 @@ func (a *ACMEInstance) ExportCert(filenameCert, filenamePrivateKey string) {
 	defer f.Close()
 	f.WriteString(a.certificate)
 
+	//privateKey.pem
 	fmt.Println("the used Private Key was...")
 	fmt.Println(a.clientKey.PrivateKeyPEM)
 	f, err = os.Create(filenamePrivateKey)
@@ -549,5 +586,15 @@ func (a *ACMEInstance) ExportCert(filenameCert, filenamePrivateKey string) {
 	}
 	defer f.Close()
 	f.Write(a.clientKey.PrivateKeyPEM.Bytes())
+
+	//cert.crt
+	f, err = os.Create(filenameCert)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Send: %v\n", err)
+		return
+	}
+	defer f.Close()
+	f.WriteString(a.certificate)
+
 	return
 }

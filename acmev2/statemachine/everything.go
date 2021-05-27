@@ -7,6 +7,39 @@ import (
 	"time"
 )
 
+//AZUREDNSTests tbd
+func (a *ACMEInstance) AZUREDNSTests() {
+	fmt.Println("---------------------AZUREDNSTests()--------------------")
+
+	/*
+		fmt.Println("createing A-Record......")
+
+		dnsRequest := a.dnsManager.PrepareAPIRequest("azuretest.ft.8daysaweek.cc", "51.154.53.165", "A")
+		a.dnsRequest = dnsRequest
+
+		c := a.CreateACMEHTTPsConnection(a.dnsRequest.ResourceURL, a.dnsRequest.Body, "PUT")
+
+		fmt.Println("c.responseCode=", c.responseCode)
+		fmt.Println("c.responseCode=", c.responseBodyString)
+	*/
+
+	fmt.Println("createing TXT-Record......")
+
+	dnsRequest := a.dnsManager.PrepareAPIRequest("azuretest.ft.8daysaweek.cc", "huhu-im-a-Txt-record", "TXT")
+	a.dnsRequest = dnsRequest
+	a.dnsRequestCleanup = append(a.dnsRequestCleanup, a.dnsRequest)
+
+	c := a.CreateACMEHTTPsConnection(a.dnsRequest.ResourceURL, a.dnsRequest.Body, "DELETE")
+
+	fmt.Println("c.responseCode=", c.responseCode)
+	fmt.Println("c.responseCode=", c.responseBodyString)
+
+	/*if c.badNonce { //no such thing as a bad nonce
+		fmt.Println("PostAsGetDownloadCert(): bad nonce, returning false")
+		return false
+	}*/
+}
+
 //Everything gets dir, creates accounts, and gets a cert. A proof of concept implementation for a state machine
 func (a *ACMEInstance) Everything(contact []string) {
 	//fmt.Println("Start Everything-State-Machine Test...")
@@ -57,6 +90,22 @@ func (a *ACMEInstance) Everything(contact []string) {
 
 	a.PostAsGetDownloadCert()
 
+	a.CleanupChallenges()
+
+}
+
+//CleanupChallenges tbd
+func (a *ACMEInstance) CleanupChallenges() (ok bool) {
+	fmt.Println("---------------------CleanupChallenges()--------------------")
+	for _, dnsRequest := range a.dnsRequestCleanup {
+		a.dnsRequest = dnsRequest
+		c := a.CreateACMEHTTPsConnection(a.dnsRequest.ResourceURL, a.dnsRequest.Body, "DELETE")
+
+		fmt.Println("c.responseCode=", c.responseCode)
+		fmt.Println("c.responseCode=", c.responseBodyString)
+
+	}
+	return true
 }
 
 //PostAsGetDownloadCert tbd
@@ -213,8 +262,9 @@ func (a *ACMEInstance) IsChallengeFullfilled(challengeURL string) (ok bool) {
 	return false
 }
 
-//FullFillChallenges ...
+//FullFillChallenges ... sollten zwei FUnktionen sein, dann wäre StateMachine stabile
 func (a *ACMEInstance) FullFillChallenges() (ok bool) {
+	a.GetANonce()
 	fmt.Println("---------------------FullFillChallenges()--------------------")
 
 	//create A record for all domains (allways needed: unklar ob das Sinn macht)
@@ -237,6 +287,12 @@ func (a *ACMEInstance) FullFillChallenges() (ok bool) {
 
 	Challenge:
 		for _, challenge := range authObj.Challenges {
+			//funktioniert nicht, da challengeURL, token dann nicht mehr definiert sind...
+			if a.challangeCreated[challenge.URL] {
+				fmt.Println("FullFillChallenges(): Challenge allready created for url", challenge.URL)
+				challengeURL = challenge.URL
+				continue
+			}
 			switch challenge.Type {
 			case "dns-01":
 				{
@@ -246,6 +302,7 @@ func (a *ACMEInstance) FullFillChallenges() (ok bool) {
 					}
 
 					fmt.Println("FullFillChallenges(): Fullfilling dns-01 challenge")
+					a.challangeCreated[challenge.URL] = true
 
 					challengeURL = challenge.URL
 					token = challenge.Token
@@ -256,7 +313,18 @@ func (a *ACMEInstance) FullFillChallenges() (ok bool) {
 					hashOfKeyAuthorization := GetSHA256([]byte(keyAuthorization))
 
 					challengeDomain := "_acme-challenge." + domain
-					a.dnsManager.CreateTXTRecordAzureDNS(challengeDomain, hashOfKeyAuthorization)
+
+					//a.dnsManager.CreateTXTRecordAzureDNS(challengeDomain, hashOfKeyAuthorization)
+					fmt.Println("createing TXT-Record......")
+
+					dnsRequest := a.dnsManager.PrepareAPIRequest(challengeDomain, hashOfKeyAuthorization, "TXT")
+					a.dnsRequest = dnsRequest
+					a.dnsRequestCleanup = append(a.dnsRequestCleanup, a.dnsRequest)
+
+					c := a.CreateACMEHTTPsConnection(a.dnsRequest.ResourceURL, a.dnsRequest.Body, "PUT")
+
+					fmt.Println("c.responseCode=", c.responseCode)
+					fmt.Println("c.responseCode=", c.responseBodyString)
 
 					break Challenge //escape from challenge loop, as only one challange will be fullfilled
 				}
@@ -286,6 +354,11 @@ func (a *ACMEInstance) FullFillChallenges() (ok bool) {
 		}
 
 		fmt.Println("INFO: Challenge", a.challengeType, "for domain", domain, "using URL", challengeURL, "and token", token)
+
+		/*
+			HIER scheint jeweils eine frische nonce nötig zu sein, da die alte abgelaufen ist
+		*/
+		//a.GetANonce()
 
 		p := a.CreateProtectedPartKID(challengeURL)
 		//fmt.Println("protected part=", string(p))
@@ -367,6 +440,7 @@ func (a *ACMEInstance) PostNewOrder() (ok bool) {
 	err := json.Unmarshal(c.responseBodyByte, &(a.orderObject))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "PostNewOrder(): json.Unmarshal(c.responseBodyByte, &(a.orderObject) failed with error: ", err.Error())
+		fmt.Fprintln(os.Stderr, "Content c.responseBodyByte=", string(c.responseBodyByte))
 		return false
 	}
 

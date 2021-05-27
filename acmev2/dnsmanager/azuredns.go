@@ -15,14 +15,14 @@ New-AzDnsRecordSet -ZoneName _acme-challenge.letsencrypt.ft.8daysaweek.cc -Resou
 */
 
 //CreateARecordAzureDNS tbd
-func (d *AZUREDNS) CreateARecordAzureDNS(domain, ip string) (ok bool) {
+func (d *AZUREDNSCredentials) CreateARecordAzureDNS(domain, ip string) (ok bool) {
 	fmt.Println("CreateARecordAzureDNS(): ", domain, "->", ip, ".... using login/pw", d.Login, "/", d.Password)
 
 	return true
 }
 
 //CreateTXTRecordAzureDNS tbd
-func (d *AZUREDNS) CreateTXTRecordAzureDNS(domain, txt string) (ok bool) {
+func (d *AZUREDNSCredentials) CreateTXTRecordAzureDNS(domain, txt string) (ok bool) {
 	fmt.Println("CreateTXTRecordAzureDNS(): ", domain, "<->", txt, ".... using login/pw", d.Login, "/", d.Password)
 
 	return true
